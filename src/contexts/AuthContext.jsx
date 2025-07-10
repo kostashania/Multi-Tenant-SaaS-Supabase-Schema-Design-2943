@@ -16,11 +16,25 @@ export const AuthProvider = ({ children }) => {
   const [userType, setUserType] = useState(null) // 'superadmin' or 'company'
   const [company, setCompany] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
+    // Check for stored authentication
+    const storedUserId = localStorage.getItem('userId')
+    const storedToken = localStorage.getItem('token')
+    const storedUserType = localStorage.getItem('userType')
+    const storedCompany = localStorage.getItem('company')
+
+    if (storedUserId && storedToken) {
+      setUser({ id: storedUserId, email: localStorage.getItem('userEmail') })
+      setUserType(storedUserType)
+      setCompany(storedCompany ? JSON.parse(storedCompany) : null)
+      setIsAuthenticated(true)
+    }
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
+      if (session && !storedUserId) {
         handleAuthChange(session)
       } else {
         setLoading(false)
@@ -33,10 +47,7 @@ export const AuthProvider = ({ children }) => {
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
           await handleAuthChange(session)
         } else if (event === 'SIGNED_OUT') {
-          setUser(null)
-          setUserType(null)
-          setCompany(null)
-          setLoading(false)
+          handleLogout()
         }
       }
     )
@@ -63,6 +74,13 @@ export const AuthProvider = ({ children }) => {
       if (superAdmin) {
         setUserType('superadmin')
         setCompany(null)
+        setIsAuthenticated(true)
+        
+        // Store in localStorage
+        localStorage.setItem('userId', session.user.id)
+        localStorage.setItem('token', session.access_token)
+        localStorage.setItem('userEmail', session.user.email)
+        localStorage.setItem('userType', 'superadmin')
       } else {
         // Check if user belongs to a company
         const { data: companies } = await supabase
@@ -96,6 +114,14 @@ export const AuthProvider = ({ children }) => {
         if (userCompany) {
           setUserType('company')
           setCompany(userCompany)
+          setIsAuthenticated(true)
+          
+          // Store in localStorage
+          localStorage.setItem('userId', session.user.id)
+          localStorage.setItem('token', session.access_token)
+          localStorage.setItem('userEmail', session.user.email)
+          localStorage.setItem('userType', 'company')
+          localStorage.setItem('company', JSON.stringify(userCompany))
         } else {
           // User not found in any company or company not verified
           await supabase.auth.signOut()
@@ -106,22 +132,67 @@ export const AuthProvider = ({ children }) => {
       console.error('Auth error:', error)
       await supabase.auth.signOut()
     }
-
     setLoading(false)
   }
 
+  const handleQuestLogin = async ({ userId, token, newUser }) => {
+    try {
+      // Store Quest authentication data
+      localStorage.setItem('userId', userId)
+      localStorage.setItem('token', token)
+      localStorage.setItem('userEmail', userId) // Using userId as email for Quest
+      
+      // For demo purposes, determine user type based on email
+      if (userId === 'admin@system.com') {
+        setUserType('superadmin')
+        setCompany(null)
+        localStorage.setItem('userType', 'superadmin')
+      } else {
+        // Default to company user
+        setUserType('company')
+        // Set a default company for demo
+        const defaultCompany = {
+          id: 'demo-company',
+          name: 'Demo Company',
+          schema_name: 'saas01_testco01'
+        }
+        setCompany(defaultCompany)
+        localStorage.setItem('userType', 'company')
+        localStorage.setItem('company', JSON.stringify(defaultCompany))
+      }
+      
+      setUser({ id: userId, email: userId })
+      setIsAuthenticated(true)
+      
+      return { newUser, userType: localStorage.getItem('userType') }
+    } catch (error) {
+      console.error('Quest login error:', error)
+      throw error
+    }
+  }
+
   const login = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password
-    })
-    
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
   }
 
+  const handleLogout = () => {
+    // Clear all stored data
+    localStorage.removeItem('userId')
+    localStorage.removeItem('token')
+    localStorage.removeItem('userEmail')
+    localStorage.removeItem('userType')
+    localStorage.removeItem('company')
+    
+    setUser(null)
+    setUserType(null)
+    setCompany(null)
+    setIsAuthenticated(false)
+  }
+
   const logout = async () => {
-    const { error } = await supabase.auth.signOut()
-    if (error) throw error
+    handleLogout()
+    await supabase.auth.signOut()
   }
 
   const value = {
@@ -129,8 +200,10 @@ export const AuthProvider = ({ children }) => {
     userType,
     company,
     loading,
+    isAuthenticated,
     login,
-    logout
+    logout,
+    handleQuestLogin
   }
 
   return (

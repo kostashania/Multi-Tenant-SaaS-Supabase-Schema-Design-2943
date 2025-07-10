@@ -1,13 +1,17 @@
 import React from 'react'
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
+import { QuestProvider } from '@questlabs/react-sdk'
+import '@questlabs/react-sdk/dist/style.css'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
-import LoginForm from './components/Auth/LoginForm'
+import LoginPage from './components/Auth/LoginPage'
+import OnboardingPage from './components/Auth/OnboardingPage'
 import SuperAdminDashboard from './components/SuperAdmin/SuperAdminDashboard'
 import CompanyDashboard from './components/Company/CompanyDashboard'
+import questConfig from './config/questConfig'
 import './App.css'
 
 const AppContent = () => {
-  const { user, userType, loading } = useAuth()
+  const { user, userType, loading, isAuthenticated } = useAuth()
 
   if (loading) {
     return (
@@ -17,41 +21,61 @@ const AppContent = () => {
     )
   }
 
-  if (!user) {
-    return <LoginForm />
+  if (!isAuthenticated) {
+    return <LoginPage />
   }
 
   return (
     <Routes>
-      <Route
-        path="/"
+      <Route 
+        path="/" 
         element={
           userType === 'superadmin' ? (
             <Navigate to="/superadmin" replace />
           ) : (
             <Navigate to="/company" replace />
           )
-        }
+        } 
       />
-      <Route
-        path="/superadmin"
+      <Route 
+        path="/login" 
+        element={
+          isAuthenticated ? (
+            <Navigate to="/" replace />
+          ) : (
+            <LoginPage />
+          )
+        } 
+      />
+      <Route 
+        path="/onboarding" 
+        element={
+          isAuthenticated ? (
+            <OnboardingPage />
+          ) : (
+            <Navigate to="/login" replace />
+          )
+        } 
+      />
+      <Route 
+        path="/superadmin" 
         element={
           userType === 'superadmin' ? (
             <SuperAdminDashboard />
           ) : (
             <Navigate to="/company" replace />
           )
-        }
+        } 
       />
-      <Route
-        path="/company"
+      <Route 
+        path="/company" 
         element={
           userType === 'company' ? (
             <CompanyDashboard />
           ) : (
             <Navigate to="/superadmin" replace />
           )
-        }
+        } 
       />
     </Routes>
   )
@@ -59,11 +83,17 @@ const AppContent = () => {
 
 function App() {
   return (
-    <Router>
-      <AuthProvider>
-        <AppContent />
-      </AuthProvider>
-    </Router>
+    <QuestProvider
+      apiKey={questConfig.APIKEY}
+      entityId={questConfig.ENTITYID}
+      apiType="PRODUCTION"
+    >
+      <Router>
+        <AuthProvider>
+          <AppContent />
+        </AuthProvider>
+      </Router>
+    </QuestProvider>
   )
 }
 
