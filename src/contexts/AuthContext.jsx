@@ -19,22 +19,25 @@ export const AuthProvider = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
 
   useEffect(() => {
-    // Check for stored authentication
+    // Check for stored authentication first
     const storedUserId = localStorage.getItem('userId')
     const storedToken = localStorage.getItem('token')
     const storedUserType = localStorage.getItem('userType')
     const storedCompany = localStorage.getItem('company')
+    const storedEmail = localStorage.getItem('userEmail')
 
-    if (storedUserId && storedToken) {
-      setUser({ id: storedUserId, email: localStorage.getItem('userEmail') })
+    if (storedUserId && storedToken && storedEmail) {
+      setUser({ id: storedUserId, email: storedEmail })
       setUserType(storedUserType)
       setCompany(storedCompany ? JSON.parse(storedCompany) : null)
       setIsAuthenticated(true)
+      setLoading(false)
+      return
     }
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session && !storedUserId) {
+      if (session) {
         handleAuthChange(session)
       } else {
         setLoading(false)
@@ -44,7 +47,7 @@ export const AuthProvider = ({ children }) => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (event === 'SIGNED_IN') {
           await handleAuthChange(session)
         } else if (event === 'SIGNED_OUT') {
           handleLogout()
@@ -56,16 +59,18 @@ export const AuthProvider = ({ children }) => {
   }, [])
 
   const handleAuthChange = async (session) => {
-    if (!session) {
+    if (!session?.user?.email) {
       setLoading(false)
       return
     }
 
-    setUser(session.user)
+    const email = session.user.email
 
     try {
-      // For simplicity, just set as superadmin if email is admin@system.com
-      if (session.user.email === 'admin@system.com') {
+      // Check if user is authorized
+      if (email === 'admin@system.com') {
+        // Superadmin
+        setUser(session.user)
         setUserType('superadmin')
         setCompany(null)
         setIsAuthenticated(true)
@@ -73,10 +78,11 @@ export const AuthProvider = ({ children }) => {
         // Store in localStorage
         localStorage.setItem('userId', session.user.id)
         localStorage.setItem('token', session.access_token)
-        localStorage.setItem('userEmail', session.user.email)
+        localStorage.setItem('userEmail', email)
         localStorage.setItem('userType', 'superadmin')
-      } else if (session.user.email === 'admin01@testco01.com') {
-        // For demo, just set as company if email is admin01@testco01.com
+        
+      } else if (email === 'admin01@testco01.com') {
+        // Company user
         const demoCompany = {
           id: '12345-demo-id',
           name: 'Test Company 01',
@@ -84,6 +90,7 @@ export const AuthProvider = ({ children }) => {
           schema_name: 'saas01_testco01'
         }
         
+        setUser(session.user)
         setUserType('company')
         setCompany(demoCompany)
         setIsAuthenticated(true)
@@ -91,28 +98,42 @@ export const AuthProvider = ({ children }) => {
         // Store in localStorage
         localStorage.setItem('userId', session.user.id)
         localStorage.setItem('token', session.access_token)
-        localStorage.setItem('userEmail', session.user.email)
+        localStorage.setItem('userEmail', email)
         localStorage.setItem('userType', 'company')
         localStorage.setItem('company', JSON.stringify(demoCompany))
+        
       } else {
-        // Not an authorized user
+        // Unauthorized user - sign them out but don't throw error
+        console.warn('Unauthorized user attempted login:', email)
         await supabase.auth.signOut()
-        throw new Error('Access denied. User not authorized.')
+        throw new Error('Access denied. Please use valid demo credentials.')
       }
     } catch (error) {
       console.error('Auth error:', error)
-      await supabase.auth.signOut()
+      // Don't sign out again if already signed out
+      if (session) {
+        await supabase.auth.signOut()
+      }
+      // Clear any stored data
+      handleLogout()
+      throw error
     }
     
     setLoading(false)
   }
 
   const login = async (email, password) => {
-    const { error } = await supabase.auth.signInWithPassword({ 
-      email, 
-      password 
-    })
-    if (error) throw error
+    try {
+      const { error } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password 
+      })
+      if (error) throw error
+    } catch (error) {
+      // Make sure we're not in a loading state
+      setLoading(false)
+      throw error
+    }
   }
 
   const handleLogout = () => {
@@ -127,11 +148,16 @@ export const AuthProvider = ({ children }) => {
     setUserType(null)
     setCompany(null)
     setIsAuthenticated(false)
+    setLoading(false)
   }
 
   const logout = async () => {
     handleLogout()
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut()
+    } catch (error) {
+      console.error('Logout error:', error)
+    }
   }
 
   const value = {

@@ -1,6 +1,5 @@
 import React, { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import * as FiIcons from 'react-icons/fi'
 import SafeIcon from '../../common/SafeIcon'
@@ -13,8 +12,8 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  
   const { login } = useAuth()
-  const navigate = useNavigate()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -25,10 +24,17 @@ const LoginPage = () => {
       await login(email, password)
       // Navigation will be handled by AuthContext after successful login
     } catch (error) {
+      console.error('Login error:', error)
       setError(error.message || 'Login failed. Please check your credentials.')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleDemoLogin = (demoEmail, demoPassword) => {
+    setEmail(demoEmail)
+    setPassword(demoPassword)
+    setError('')
   }
 
   return (
@@ -170,10 +176,30 @@ const LoginPage = () => {
             </form>
 
             <div className="mt-8 text-center">
-              <div className="text-xs text-gray-500 space-y-1">
+              <div className="text-xs text-gray-500 space-y-3">
                 <p className="font-medium">Demo Credentials:</p>
-                <p>Superadmin: admin@system.com / admin123</p>
-                <p>Company: admin01@testco01.com / admin123</p>
+                
+                <div className="space-y-2">
+                  <button
+                    type="button"
+                    onClick={() => handleDemoLogin('admin@system.com', 'admin123')}
+                    className="block w-full text-left p-2 bg-blue-50 hover:bg-blue-100 rounded transition-colors"
+                  >
+                    <span className="font-medium text-blue-700">Superadmin:</span>
+                    <br />
+                    <span className="text-blue-600">admin@system.com / admin123</span>
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => handleDemoLogin('admin01@testco01.com', 'admin123')}
+                    className="block w-full text-left p-2 bg-green-50 hover:bg-green-100 rounded transition-colors"
+                  >
+                    <span className="font-medium text-green-700">Company:</span>
+                    <br />
+                    <span className="text-green-600">admin01@testco01.com / admin123</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
