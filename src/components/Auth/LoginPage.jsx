@@ -1,30 +1,33 @@
-import React from 'react'
-import { QuestLogin } from '@questlabs/react-sdk'
+import React, { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
-import questConfig from '../../config/questConfig'
+import * as FiIcons from 'react-icons/fi'
+import SafeIcon from '../../common/SafeIcon'
+
+const { FiMail, FiLock, FiEye, FiEyeOff } = FiIcons
 
 const LoginPage = () => {
-  const { handleQuestLogin } = useAuth()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const { login } = useAuth()
   const navigate = useNavigate()
 
-  const handleLogin = async ({ userId, token, newUser }) => {
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+    setError('')
+
     try {
-      const { userType } = await handleQuestLogin({ userId, token, newUser })
-      
-      if (newUser) {
-        navigate('/onboarding')
-      } else {
-        // Navigate based on user type
-        if (userType === 'superadmin') {
-          navigate('/superadmin')
-        } else {
-          navigate('/company')
-        }
-      }
+      await login(email, password)
+      // Navigation will be handled by AuthContext after successful login
     } catch (error) {
-      console.error('Login error:', error)
+      setError(error.message || 'Login failed. Please check your credentials.')
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -78,24 +81,93 @@ const LoginPage = () => {
         >
           <div className="bg-white rounded-2xl shadow-xl p-8">
             <div className="text-center mb-8">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ delay: 0.2, type: "spring", stiffness: 260, damping: 20 }}
+                className="mx-auto h-16 w-16 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mb-4"
+              >
+                <SafeIcon icon={FiLock} className="h-8 w-8 text-white" />
+              </motion.div>
               <h2 className="text-3xl font-bold text-gray-900 mb-2">Sign In</h2>
               <p className="text-gray-600">Access your dashboard</p>
             </div>
 
-            <div className="quest-login-container">
-              <QuestLogin
-                onSubmit={handleLogin}
-                email={true}
-                google={false}
-                accent={questConfig.PRIMARY_COLOR}
-                styling={{
-                  primaryColor: questConfig.PRIMARY_COLOR,
-                  backgroundColor: '#ffffff',
-                  borderRadius: '8px',
-                  fontSize: '16px'
-                }}
-              />
-            </div>
+            <form onSubmit={handleSubmit} className="space-y-6">
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
+                    Email Address
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <SafeIcon icon={FiMail} className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      id="email"
+                      name="email"
+                      type="email"
+                      required
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="block w-full pl-10 pr-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      placeholder="Enter your email"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
+                    Password
+                  </label>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <SafeIcon icon={FiLock} className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      id="password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="block w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-colors"
+                      placeholder="Enter your password"
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      <SafeIcon 
+                        icon={showPassword ? FiEyeOff : FiEye} 
+                        className="h-5 w-5 text-gray-400 hover:text-gray-600" 
+                      />
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {error && (
+                <motion.div
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  className="bg-red-50 border border-red-200 rounded-lg p-3"
+                >
+                  <p className="text-sm text-red-600">{error}</p>
+                </motion.div>
+              )}
+
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                type="submit"
+                disabled={loading}
+                className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              >
+                {loading ? 'Signing in...' : 'Sign In'}
+              </motion.button>
+            </form>
 
             <div className="mt-8 text-center">
               <div className="text-xs text-gray-500 space-y-1">

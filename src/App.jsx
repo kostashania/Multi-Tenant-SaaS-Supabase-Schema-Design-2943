@@ -1,13 +1,9 @@
 import React from 'react'
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import { QuestProvider } from '@questlabs/react-sdk'
-import '@questlabs/react-sdk/dist/style.css'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import LoginPage from './components/Auth/LoginPage'
-import OnboardingPage from './components/Auth/OnboardingPage'
 import SuperAdminDashboard from './components/SuperAdmin/SuperAdminDashboard'
 import CompanyDashboard from './components/Company/CompanyDashboard'
-import questConfig from './config/questConfig'
 import './App.css'
 
 const AppContent = () => {
@@ -48,16 +44,6 @@ const AppContent = () => {
         } 
       />
       <Route 
-        path="/onboarding" 
-        element={
-          isAuthenticated ? (
-            <OnboardingPage />
-          ) : (
-            <Navigate to="/login" replace />
-          )
-        } 
-      />
-      <Route 
         path="/superadmin" 
         element={
           userType === 'superadmin' ? (
@@ -83,17 +69,11 @@ const AppContent = () => {
 
 function App() {
   return (
-    <QuestProvider
-      apiKey={questConfig.APIKEY}
-      entityId={questConfig.ENTITYID}
-      apiType="PRODUCTION"
-    >
-      <Router>
-        <AuthProvider>
-          <AppContent />
-        </AuthProvider>
-      </Router>
-    </QuestProvider>
+    <Router>
+      <AuthProvider>
+        <AppContent />
+      </AuthProvider>
+    </Router>
   )
 }
 

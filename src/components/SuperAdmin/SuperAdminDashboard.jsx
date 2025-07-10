@@ -7,8 +7,9 @@ import SafeIcon from '../../common/SafeIcon'
 import CompanyManagement from './CompanyManagement'
 import PackageManagement from './PackageManagement'
 import SubscriptionManagement from './SubscriptionManagement'
+import SystemSettings from './SystemSettings'
 
-const { FiUsers, FiPackage, FiCreditCard, FiLogOut, FiBarChart3 } = FiIcons
+const { FiUsers, FiPackage, FiCreditCard, FiLogOut, FiBarChart3, FiSettings } = FiIcons
 
 const SuperAdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview')
@@ -49,7 +50,8 @@ const SuperAdminDashboard = () => {
     { id: 'overview', label: 'Overview', icon: FiBarChart3 },
     { id: 'companies', label: 'Companies', icon: FiUsers },
     { id: 'packages', label: 'Packages', icon: FiPackage },
-    { id: 'subscriptions', label: 'Subscriptions', icon: FiCreditCard }
+    { id: 'subscriptions', label: 'Subscriptions', icon: FiCreditCard },
+    { id: 'settings', label: 'Settings', icon: FiSettings }
   ]
 
   const statCards = [
@@ -67,6 +69,8 @@ const SuperAdminDashboard = () => {
         return <PackageManagement onUpdate={fetchStats} />
       case 'subscriptions':
         return <SubscriptionManagement onUpdate={fetchStats} />
+      case 'settings':
+        return <SystemSettings onUpdate={fetchStats} />
       default:
         return (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">

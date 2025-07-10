@@ -1,9 +1,9 @@
 -- This file contains the SQL schema for the multi-tenant SaaS application
 -- Execute these commands in your Supabase SQL editor
 
--- =============================================
+--=============================================
 -- SCHEMA: saas02 (Main/Global Schema)
--- =============================================
+--=============================================
 
 -- Create the main schema
 CREATE SCHEMA IF NOT EXISTS saas02;
@@ -55,9 +55,27 @@ CREATE TABLE IF NOT EXISTS saas02.subscriptions (
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- =============================================
+-- System settings table
+CREATE TABLE IF NOT EXISTS saas02.system_settings (
+  id INTEGER PRIMARY KEY DEFAULT 1,
+  settings JSONB NOT NULL DEFAULT '{
+    "otp_enabled": false,
+    "otp_method": "email",
+    "session_timeout": 24,
+    "max_login_attempts": 5,
+    "require_password_change": false,
+    "password_expiry_days": 90
+  }',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Ensure only one settings record exists
+ALTER TABLE saas02.system_settings ADD CONSTRAINT single_settings_row CHECK (id = 1);
+
+--=============================================
 -- TENANT SCHEMAS (saas01_testco01, saas01_testco02)
--- =============================================
+--=============================================
 
 -- Function to create tenant schema
 CREATE OR REPLACE FUNCTION create_tenant_schema(schema_name TEXT)
@@ -65,7 +83,7 @@ RETURNS VOID AS $$
 BEGIN
   -- Create the schema
   EXECUTE format('CREATE SCHEMA IF NOT EXISTS %I', schema_name);
-  
+
   -- Create users table
   EXECUTE format('
     CREATE TABLE IF NOT EXISTS %I.users (
@@ -76,7 +94,7 @@ BEGIN
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )', schema_name);
-    
+
   -- Create categories table
   EXECUTE format('
     CREATE TABLE IF NOT EXISTS %I.categories (
@@ -86,7 +104,7 @@ BEGIN
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )', schema_name);
-    
+
   -- Create items table
   EXECUTE format('
     CREATE TABLE IF NOT EXISTS %I.items (
@@ -99,23 +117,23 @@ BEGIN
       created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
       updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
     )', schema_name, schema_name);
-    
+
   -- Enable RLS on all tables
   EXECUTE format('ALTER TABLE %I.users ENABLE ROW LEVEL SECURITY', schema_name);
   EXECUTE format('ALTER TABLE %I.categories ENABLE ROW LEVEL SECURITY', schema_name);
   EXECUTE format('ALTER TABLE %I.items ENABLE ROW LEVEL SECURITY', schema_name);
-  
+
   -- Create RLS policies (allow all for now, can be restricted later)
   EXECUTE format('
     CREATE POLICY "Allow all operations" ON %I.users
     FOR ALL USING (true) WITH CHECK (true)
   ', schema_name);
-  
+
   EXECUTE format('
     CREATE POLICY "Allow all operations" ON %I.categories
     FOR ALL USING (true) WITH CHECK (true)
   ', schema_name);
-  
+
   EXECUTE format('
     CREATE POLICY "Allow all operations" ON %I.items
     FOR ALL USING (true) WITH CHECK (true)
@@ -123,13 +141,22 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- =============================================
+--=============================================
 -- SEED DATA
--- =============================================
+--=============================================
 
 -- Insert superadmin
-INSERT INTO saas02.superadmins (email) VALUES ('admin@system.com')
-ON CONFLICT (email) DO NOTHING;
+INSERT INTO saas02.superadmins (email) VALUES ('admin@system.com') ON CONFLICT (email) DO NOTHING;
+
+-- Insert default system settings
+INSERT INTO saas02.system_settings (id, settings) VALUES (1, '{
+  "otp_enabled": false,
+  "otp_method": "email",
+  "session_timeout": 24,
+  "max_login_attempts": 5,
+  "require_password_change": false,
+  "password_expiry_days": 90
+}') ON CONFLICT (id) DO NOTHING;
 
 -- Insert packages
 INSERT INTO saas02.packages (name, duration, options_json) VALUES
@@ -151,14 +178,14 @@ SELECT create_tenant_schema('saas01_testco02');
 -- Insert subscriptions
 INSERT INTO saas02.subscriptions (company_id, package_id, start_date, end_date)
 SELECT 
-  c.id,
-  p.id,
-  CURRENT_DATE,
+  c.id, 
+  p.id, 
+  CURRENT_DATE, 
   CURRENT_DATE + INTERVAL '1 year'
 FROM saas02.companies c
 CROSS JOIN saas02.packages p
 WHERE c.slug IN ('testco01', 'testco02')
-AND p.name = 'Basic Plan'
+  AND p.name = 'Basic Plan'
 ON CONFLICT DO NOTHING;
 
 -- Seed tenant data for testco01
@@ -185,9 +212,9 @@ INSERT INTO saas01_testco02.categories (name, description) VALUES
   ('Software', 'Software licenses and tools')
 ON CONFLICT DO NOTHING;
 
--- =============================================
+--=============================================
 -- AUTHENTICATION SETUP
--- =============================================
+--=============================================
 
 -- Create auth users for superadmin and company users
 -- Note: These would typically be created through Supabase Auth UI or API
@@ -199,9 +226,9 @@ ON CONFLICT DO NOTHING;
 -- Company Admin 02: admin02@testco02.com / admin123
 -- Company User 02: user02@testco02.com / user123
 
--- =============================================
+--=============================================
 -- UTILITY FUNCTIONS
--- =============================================
+--=============================================
 
 -- Function to get company by user email
 CREATE OR REPLACE FUNCTION get_company_by_email(user_email TEXT)
@@ -213,12 +240,11 @@ BEGIN
   FOR comp IN 
     SELECT c.id, c.name, c.schema_name 
     FROM saas02.companies c 
-    WHERE c.is_verified = true
+    WHERE c.is_verified = true 
   LOOP
     -- Check if user exists in this company's schema
     EXECUTE format('SELECT EXISTS(SELECT 1 FROM %I.users WHERE email = $1)', comp.schema_name) 
-    INTO tenant_client_exists 
-    USING user_email;
+    INTO tenant_client_exists USING user_email;
     
     IF tenant_client_exists THEN
       company_id := comp.id;
@@ -236,5 +262,16 @@ CREATE OR REPLACE FUNCTION is_superadmin(user_email TEXT)
 RETURNS BOOLEAN AS $$
 BEGIN
   RETURN EXISTS(SELECT 1 FROM saas02.superadmins WHERE email = user_email);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to get system settings
+CREATE OR REPLACE FUNCTION get_system_settings()
+RETURNS JSONB AS $$
+DECLARE
+  settings_data JSONB;
+BEGIN
+  SELECT settings INTO settings_data FROM saas02.system_settings WHERE id = 1;
+  RETURN COALESCE(settings_data, '{}'::JSONB);
 END;
 $$ LANGUAGE plpgsql;
