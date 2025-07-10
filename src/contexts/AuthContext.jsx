@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react'
-import { supabase, createTenantClient } from '../config/supabase'
+import { supabase } from '../config/supabase'
 
 const AuthContext = createContext()
 
@@ -64,14 +64,8 @@ export const AuthProvider = ({ children }) => {
     setUser(session.user)
 
     try {
-      // Check if user is superadmin
-      const { data: superAdmin } = await supabase
-        .from('superadmins')
-        .select('*')
-        .eq('email', session.user.email)
-        .single()
-
-      if (superAdmin) {
+      // For simplicity, just set as superadmin if email is admin@system.com
+      if (session.user.email === 'admin@system.com') {
         setUserType('superadmin')
         setCompany(null)
         setIsAuthenticated(true)
@@ -81,57 +75,35 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('token', session.access_token)
         localStorage.setItem('userEmail', session.user.email)
         localStorage.setItem('userType', 'superadmin')
+      } else if (session.user.email === 'admin01@testco01.com') {
+        // For demo, just set as company if email is admin01@testco01.com
+        const demoCompany = {
+          id: '12345-demo-id',
+          name: 'Test Company 01',
+          slug: 'testco01',
+          schema_name: 'saas01_testco01'
+        }
+        
+        setUserType('company')
+        setCompany(demoCompany)
+        setIsAuthenticated(true)
+        
+        // Store in localStorage
+        localStorage.setItem('userId', session.user.id)
+        localStorage.setItem('token', session.access_token)
+        localStorage.setItem('userEmail', session.user.email)
+        localStorage.setItem('userType', 'company')
+        localStorage.setItem('company', JSON.stringify(demoCompany))
       } else {
-        // Check if user belongs to a company
-        const { data: companies } = await supabase
-          .from('companies')
-          .select('*')
-          .eq('is_verified', true)
-
-        let userCompany = null
-        if (companies && companies.length > 0) {
-          for (const comp of companies) {
-            try {
-              // Check if user exists in this company's schema
-              const tenantClient = createTenantClient(comp.schema_name)
-              const { data: companyUser } = await tenantClient
-                .from('users')
-                .select('*')
-                .eq('email', session.user.email)
-                .single()
-
-              if (companyUser) {
-                userCompany = comp
-                break
-              }
-            } catch (error) {
-              // Continue to next company if this one fails
-              console.log(`No user found in ${comp.schema_name}`)
-            }
-          }
-        }
-
-        if (userCompany) {
-          setUserType('company')
-          setCompany(userCompany)
-          setIsAuthenticated(true)
-          
-          // Store in localStorage
-          localStorage.setItem('userId', session.user.id)
-          localStorage.setItem('token', session.access_token)
-          localStorage.setItem('userEmail', session.user.email)
-          localStorage.setItem('userType', 'company')
-          localStorage.setItem('company', JSON.stringify(userCompany))
-        } else {
-          // User not found in any company or company not verified
-          await supabase.auth.signOut()
-          throw new Error('Access denied. Company not verified or user not found.')
-        }
+        // Not an authorized user
+        await supabase.auth.signOut()
+        throw new Error('Access denied. User not authorized.')
       }
     } catch (error) {
       console.error('Auth error:', error)
       await supabase.auth.signOut()
     }
+    
     setLoading(false)
   }
 

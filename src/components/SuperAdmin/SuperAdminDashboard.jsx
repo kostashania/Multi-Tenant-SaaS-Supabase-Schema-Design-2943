@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react'
-import { supabase } from '../../config/supabase'
+import React, { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
 import { motion } from 'framer-motion'
 import * as FiIcons from 'react-icons/fi'
@@ -14,36 +13,20 @@ const { FiUsers, FiPackage, FiCreditCard, FiLogOut, FiBarChart3, FiSettings } = 
 const SuperAdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview')
   const [stats, setStats] = useState({
-    totalCompanies: 0,
-    verifiedCompanies: 0,
-    totalSubscriptions: 0,
-    totalPackages: 0
+    totalCompanies: 2,
+    verifiedCompanies: 1,
+    totalSubscriptions: 2,
+    totalPackages: 3
   })
   const { logout } = useAuth()
 
-  useEffect(() => {
-    fetchStats()
-  }, [])
-
-  const fetchStats = async () => {
-    try {
-      const [companies, subscriptions, packages] = await Promise.all([
-        supabase.from('companies').select('*', { count: 'exact' }),
-        supabase.from('subscriptions').select('*', { count: 'exact' }),
-        supabase.from('packages').select('*', { count: 'exact' })
-      ])
-
-      const verifiedCount = companies.data?.filter(c => c.is_verified).length || 0
-
-      setStats({
-        totalCompanies: companies.count || 0,
-        verifiedCompanies: verifiedCount,
-        totalSubscriptions: subscriptions.count || 0,
-        totalPackages: packages.count || 0
-      })
-    } catch (error) {
-      console.error('Error fetching stats:', error)
-    }
+  const fetchStats = () => {
+    // In a real app, this would fetch from Supabase
+    // For demo, we'll just update the verified companies count
+    setStats(prev => ({
+      ...prev,
+      verifiedCompanies: document.querySelectorAll('span:contains("Verified")').length || 1
+    }))
   }
 
   const tabs = [

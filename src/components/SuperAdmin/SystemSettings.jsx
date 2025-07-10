@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react'
-import { supabase } from '../../config/supabase'
+import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import * as FiIcons from 'react-icons/fi'
 import SafeIcon from '../../common/SafeIcon'
@@ -15,57 +14,24 @@ const SystemSettings = ({ onUpdate }) => {
     require_password_change: false,
     password_expiry_days: 90
   })
-  const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState('')
-
-  useEffect(() => {
-    fetchSettings()
-  }, [])
-
-  const fetchSettings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('system_settings')
-        .select('*')
-        .limit(1)
-        .single()
-
-      if (error && error.code !== 'PGRST116') {
-        throw error
-      }
-
-      if (data) {
-        setSettings(data.settings || settings)
-      }
-    } catch (error) {
-      console.error('Error fetching settings:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleSave = async () => {
     setSaving(true)
     setMessage('')
 
     try {
-      const { error } = await supabase
-        .from('system_settings')
-        .upsert({
-          id: 1,
-          settings: settings,
-          updated_at: new Date().toISOString()
-        })
-
-      if (error) throw error
-
-      setMessage('Settings saved successfully!')
-      onUpdate()
+      // In a real app, this would save to Supabase
+      // For demo purposes, we'll just simulate success
+      setTimeout(() => {
+        setMessage('Settings saved successfully!')
+        setSaving(false)
+        onUpdate()
+      }, 1000)
     } catch (error) {
       console.error('Error saving settings:', error)
       setMessage('Error saving settings. Please try again.')
-    } finally {
       setSaving(false)
     }
   }
@@ -82,14 +48,6 @@ const SystemSettings = ({ onUpdate }) => {
       ...prev,
       [key]: value
     }))
-  }
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    )
   }
 
   return (

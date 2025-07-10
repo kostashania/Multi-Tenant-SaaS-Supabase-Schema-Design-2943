@@ -1,5 +1,4 @@
-import React, { useState, useEffect } from 'react'
-import { supabase } from '../../config/supabase'
+import React, { useState } from 'react'
 import { motion } from 'framer-motion'
 import * as FiIcons from 'react-icons/fi'
 import SafeIcon from '../../common/SafeIcon'
@@ -7,8 +6,24 @@ import SafeIcon from '../../common/SafeIcon'
 const { FiCheck, FiX, FiEye, FiEdit2, FiPlus } = FiIcons
 
 const CompanyManagement = ({ onUpdate }) => {
-  const [companies, setCompanies] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [companies, setCompanies] = useState([
+    {
+      id: '12345-demo-id',
+      name: 'Test Company 01',
+      slug: 'testco01',
+      schema_name: 'saas01_testco01',
+      admin_email: 'admin01@testco01.com',
+      is_verified: true
+    },
+    {
+      id: '67890-demo-id',
+      name: 'Test Company 02',
+      slug: 'testco02',
+      schema_name: 'saas01_testco02',
+      admin_email: 'admin02@testco02.com',
+      is_verified: false
+    }
+  ])
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [newCompany, setNewCompany] = useState({
     name: '',
@@ -16,75 +31,37 @@ const CompanyManagement = ({ onUpdate }) => {
     admin_email: ''
   })
 
-  useEffect(() => {
-    fetchCompanies()
-  }, [])
-
-  const fetchCompanies = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('*')
-        .order('created_at', { ascending: false })
-
-      if (error) throw error
-      setCompanies(data || [])
-    } catch (error) {
-      console.error('Error fetching companies:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
-
   const toggleVerification = async (companyId, currentStatus) => {
-    try {
-      const { error } = await supabase
-        .from('companies')
-        .update({ is_verified: !currentStatus })
-        .eq('id', companyId)
-
-      if (error) throw error
-      
-      await fetchCompanies()
-      onUpdate()
-    } catch (error) {
-      console.error('Error updating company:', error)
-    }
+    // Update company verification status
+    const updatedCompanies = companies.map(company => {
+      if (company.id === companyId) {
+        return { ...company, is_verified: !currentStatus }
+      }
+      return company
+    })
+    
+    setCompanies(updatedCompanies)
+    onUpdate()
   }
 
   const createCompany = async (e) => {
     e.preventDefault()
     
-    try {
-      const schemaName = `saas01_${newCompany.slug}`
-      
-      const { error } = await supabase
-        .from('companies')
-        .insert([{
-          name: newCompany.name,
-          slug: newCompany.slug,
-          schema_name: schemaName,
-          admin_email: newCompany.admin_email,
-          is_verified: false
-        }])
-
-      if (error) throw error
-
-      setNewCompany({ name: '', slug: '', admin_email: '' })
-      setShowCreateForm(false)
-      await fetchCompanies()
-      onUpdate()
-    } catch (error) {
-      console.error('Error creating company:', error)
+    // Create a new company with demo data
+    const schemaName = `saas01_${newCompany.slug}`
+    const newCompanyData = {
+      id: `${Date.now()}-demo-id`,
+      name: newCompany.name,
+      slug: newCompany.slug,
+      schema_name: schemaName,
+      admin_email: newCompany.admin_email,
+      is_verified: false
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="flex justify-center items-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
-      </div>
-    )
+    
+    setCompanies([newCompanyData, ...companies])
+    setNewCompany({ name: '', slug: '', admin_email: '' })
+    setShowCreateForm(false)
+    onUpdate()
   }
 
   return (
@@ -216,9 +193,7 @@ const CompanyManagement = ({ onUpdate }) => {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      company.is_verified
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-red-100 text-red-800'
+                      company.is_verified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                     }`}>
                       {company.is_verified ? 'Verified' : 'Pending'}
                     </span>
@@ -230,12 +205,15 @@ const CompanyManagement = ({ onUpdate }) => {
                         whileTap={{ scale: 0.9 }}
                         onClick={() => toggleVerification(company.id, company.is_verified)}
                         className={`p-2 rounded-full ${
-                          company.is_verified
-                            ? 'bg-red-100 text-red-600 hover:bg-red-200'
+                          company.is_verified 
+                            ? 'bg-red-100 text-red-600 hover:bg-red-200' 
                             : 'bg-green-100 text-green-600 hover:bg-green-200'
                         }`}
                       >
-                        <SafeIcon icon={company.is_verified ? FiX : FiCheck} className="h-4 w-4" />
+                        <SafeIcon 
+                          icon={company.is_verified ? FiX : FiCheck} 
+                          className="h-4 w-4" 
+                        />
                       </motion.button>
                     </div>
                   </td>

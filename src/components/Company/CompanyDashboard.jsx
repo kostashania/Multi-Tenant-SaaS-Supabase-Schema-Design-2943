@@ -1,6 +1,5 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useAuth } from '../../contexts/AuthContext'
-import { createTenantClient } from '../../config/supabase'
 import { motion } from 'framer-motion'
 import * as FiIcons from 'react-icons/fi'
 import SafeIcon from '../../common/SafeIcon'
@@ -13,37 +12,44 @@ const { FiUsers, FiFolder, FiBox, FiLogOut, FiBarChart3 } = FiIcons
 const CompanyDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview')
   const [stats, setStats] = useState({
-    totalUsers: 0,
-    totalCategories: 0,
-    totalItems: 0
+    totalUsers: 15,
+    totalCategories: 8,
+    totalItems: 42
   })
-  const [tenantClient, setTenantClient] = useState(null)
+  
   const { company, logout } = useAuth()
+  
+  // Mock tenant client for demo
+  const tenantClient = {
+    from: (table) => ({
+      select: () => ({
+        order: () => ({
+          data: table === 'users' ? [
+            { id: '1', name: 'John Doe', email: 'john@example.com', role: 'admin' },
+            { id: '2', name: 'Jane Smith', email: 'jane@example.com', role: 'user' }
+          ] : table === 'categories' ? [
+            { id: '1', name: 'Electronics', description: 'Electronic items' },
+            { id: '2', name: 'Clothing', description: 'Apparel items' }
+          ] : [
+            { id: '1', name: 'Laptop', description: 'MacBook Pro', category_id: '1', price: 1999.99, quantity: 10, categories: { name: 'Electronics' } },
+            { id: '2', name: 'T-Shirt', description: 'Cotton T-Shirt', category_id: '2', price: 29.99, quantity: 100, categories: { name: 'Clothing' } }
+          ]
+        })
+      }),
+      insert: () => ({ error: null }),
+      update: () => ({ eq: () => ({ error: null }) }),
+      delete: () => ({ eq: () => ({ error: null }) })
+    })
+  }
 
-  useEffect(() => {
-    if (company?.schema_name) {
-      const client = createTenantClient(company.schema_name)
-      setTenantClient(client)
-      fetchStats(client)
-    }
-  }, [company])
-
-  const fetchStats = async (client) => {
-    try {
-      const [users, categories, items] = await Promise.all([
-        client.from('users').select('*', { count: 'exact' }),
-        client.from('categories').select('*', { count: 'exact' }),
-        client.from('items').select('*', { count: 'exact' })
-      ])
-
-      setStats({
-        totalUsers: users.count || 0,
-        totalCategories: categories.count || 0,
-        totalItems: items.count || 0
-      })
-    } catch (error) {
-      console.error('Error fetching stats:', error)
-    }
+  const fetchStats = () => {
+    // In a real app, this would fetch from Supabase tenant schema
+    // For demo purposes, we'll just update the stats
+    setStats({
+      totalUsers: 15,
+      totalCategories: 8, 
+      totalItems: 42
+    })
   }
 
   const tabs = [
@@ -60,15 +66,13 @@ const CompanyDashboard = () => {
   ]
 
   const renderContent = () => {
-    if (!tenantClient) return null
-
     switch (activeTab) {
       case 'users':
-        return <UserManagement tenantClient={tenantClient} onUpdate={() => fetchStats(tenantClient)} />
+        return <UserManagement tenantClient={tenantClient} onUpdate={() => fetchStats()} />
       case 'categories':
-        return <CategoryManagement tenantClient={tenantClient} onUpdate={() => fetchStats(tenantClient)} />
+        return <CategoryManagement tenantClient={tenantClient} onUpdate={() => fetchStats()} />
       case 'items':
-        return <ItemManagement tenantClient={tenantClient} onUpdate={() => fetchStats(tenantClient)} />
+        return <ItemManagement tenantClient={tenantClient} onUpdate={() => fetchStats()} />
       default:
         return (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -96,7 +100,7 @@ const CompanyDashboard = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900">{company?.name} Dashboard</h1>
+              <h1 className="text-2xl font-bold text-gray-900">{company?.name || 'Company'} Dashboard</h1>
               <p className="text-sm text-gray-600">Manage your company data</p>
             </div>
             <motion.button
@@ -120,8 +124,8 @@ const CompanyDashboard = () => {
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
-                activeTab === tab.id
-                  ? 'bg-blue-500 text-white'
+                activeTab === tab.id 
+                  ? 'bg-blue-500 text-white' 
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
               }`}
             >
