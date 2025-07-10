@@ -6,9 +6,10 @@ import SafeIcon from '../../common/SafeIcon'
 import CompanyManagement from './CompanyManagement'
 import PackageManagement from './PackageManagement'
 import SubscriptionManagement from './SubscriptionManagement'
+import UserManagement from './UserManagement'
 import SystemSettings from './SystemSettings'
 
-const { FiUsers, FiPackage, FiCreditCard, FiLogOut, FiBarChart3, FiSettings } = FiIcons
+const { FiUsers, FiPackage, FiCreditCard, FiLogOut, FiBarChart3, FiSettings, FiUserCheck } = FiIcons
 
 const SuperAdminDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview')
@@ -16,13 +17,16 @@ const SuperAdminDashboard = () => {
     totalCompanies: 2,
     verifiedCompanies: 1,
     totalSubscriptions: 2,
-    totalPackages: 3
+    totalPackages: 3,
+    totalUsers: 5,
+    activeUsers: 4
   })
+  
   const { logout } = useAuth()
 
   const fetchStats = () => {
     // In a real app, this would fetch from Supabase
-    // For demo, we'll just update the verified companies count
+    // For demo, we'll just update the stats
     setStats(prev => ({
       ...prev,
       verifiedCompanies: document.querySelectorAll('span:contains("Verified")').length || 1
@@ -31,6 +35,7 @@ const SuperAdminDashboard = () => {
 
   const tabs = [
     { id: 'overview', label: 'Overview', icon: FiBarChart3 },
+    { id: 'users', label: 'Users', icon: FiUserCheck },
     { id: 'companies', label: 'Companies', icon: FiUsers },
     { id: 'packages', label: 'Packages', icon: FiPackage },
     { id: 'subscriptions', label: 'Subscriptions', icon: FiCreditCard },
@@ -40,12 +45,16 @@ const SuperAdminDashboard = () => {
   const statCards = [
     { title: 'Total Companies', value: stats.totalCompanies, color: 'blue' },
     { title: 'Verified Companies', value: stats.verifiedCompanies, color: 'green' },
-    { title: 'Active Subscriptions', value: stats.totalSubscriptions, color: 'purple' },
+    { title: 'Total Users', value: stats.totalUsers, color: 'purple' },
+    { title: 'Active Users', value: stats.activeUsers, color: 'indigo' },
+    { title: 'Active Subscriptions', value: stats.totalSubscriptions, color: 'pink' },
     { title: 'Available Packages', value: stats.totalPackages, color: 'orange' }
   ]
 
   const renderContent = () => {
     switch (activeTab) {
+      case 'users':
+        return <UserManagement onUpdate={fetchStats} />
       case 'companies':
         return <CompanyManagement onUpdate={fetchStats} />
       case 'packages':
@@ -56,7 +65,7 @@ const SuperAdminDashboard = () => {
         return <SystemSettings onUpdate={fetchStats} />
       default:
         return (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {statCards.map((card, index) => (
               <motion.div
                 key={card.title}
@@ -99,12 +108,12 @@ const SuperAdminDashboard = () => {
 
       {/* Navigation Tabs */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex space-x-1 bg-white rounded-lg p-1 shadow-sm mb-6">
+        <div className="flex space-x-1 bg-white rounded-lg p-1 shadow-sm mb-6 overflow-x-auto">
           {tabs.map((tab) => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors ${
+              className={`flex items-center space-x-2 px-4 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap ${
                 activeTab === tab.id
                   ? 'bg-blue-500 text-white'
                   : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'

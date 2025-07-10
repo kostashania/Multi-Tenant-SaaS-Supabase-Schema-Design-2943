@@ -1,4 +1,5 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
+import { supabase } from '../../config/supabase'
 import { motion } from 'framer-motion'
 import * as FiIcons from 'react-icons/fi'
 import SafeIcon from '../../common/SafeIcon'
@@ -6,62 +7,114 @@ import SafeIcon from '../../common/SafeIcon'
 const { FiCheck, FiX, FiEye, FiEdit2, FiPlus } = FiIcons
 
 const CompanyManagement = ({ onUpdate }) => {
-  const [companies, setCompanies] = useState([
-    {
-      id: '12345-demo-id',
-      name: 'Test Company 01',
-      slug: 'testco01',
-      schema_name: 'saas01_testco01',
-      admin_email: 'admin01@testco01.com',
-      is_verified: true
-    },
-    {
-      id: '67890-demo-id',
-      name: 'Test Company 02',
-      slug: 'testco02',
-      schema_name: 'saas01_testco02',
-      admin_email: 'admin02@testco02.com',
-      is_verified: false
-    }
-  ])
+  const [companies, setCompanies] = useState([])
+  const [loading, setLoading] = useState(true)
   const [showCreateForm, setShowCreateForm] = useState(false)
-  const [newCompany, setNewCompany] = useState({
+  const [editingCompany, setEditingCompany] = useState(null)
+  const [formData, setFormData] = useState({
     name: '',
     slug: '',
-    admin_email: ''
+    admin_email: '',
+    admin_name: ''
   })
 
-  const toggleVerification = async (companyId, currentStatus) => {
-    // Update company verification status
-    const updatedCompanies = companies.map(company => {
-      if (company.id === companyId) {
-        return { ...company, is_verified: !currentStatus }
-      }
-      return company
-    })
-    
-    setCompanies(updatedCompanies)
-    onUpdate()
+  useEffect(() => {
+    fetchCompanies()
+  }, [])
+
+  const fetchCompanies = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('companies')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      if (error) throw error
+      setCompanies(data || [])
+    } catch (error) {
+      console.error('Error fetching companies:', error)
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const createCompany = async (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    
-    // Create a new company with demo data
-    const schemaName = `saas01_${newCompany.slug}`
-    const newCompanyData = {
-      id: `${Date.now()}-demo-id`,
-      name: newCompany.name,
-      slug: newCompany.slug,
-      schema_name: schemaName,
-      admin_email: newCompany.admin_email,
-      is_verified: false
+    try {
+      const schemaName = `saas01_${formData.slug}`
+      const companyData = {
+        ...formData,
+        schema_name: schemaName,
+        is_verified: false
+      }
+
+      if (editingCompany) {
+        const { error } = await supabase
+          .from('companies')
+          .update(companyData)
+          .eq('id', editingCompany.id)
+        
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('companies')
+          .insert([companyData])
+        
+        if (error) throw error
+      }
+
+      resetForm()
+      await fetchCompanies()
+      onUpdate()
+    } catch (error) {
+      console.error('Error saving company:', error)
     }
-    
-    setCompanies([newCompanyData, ...companies])
-    setNewCompany({ name: '', slug: '', admin_email: '' })
+  }
+
+  const handleEdit = (company) => {
+    setEditingCompany(company)
+    setFormData({
+      name: company.name,
+      slug: company.slug,
+      admin_email: company.admin_email,
+      admin_name: company.admin_name
+    })
+    setShowCreateForm(true)
+  }
+
+  const toggleVerification = async (companyId, currentStatus) => {
+    try {
+      const { error } = await supabase
+        .from('companies')
+        .update({ is_verified: !currentStatus })
+        .eq('id', companyId)
+      
+      if (error) throw error
+      
+      await fetchCompanies()
+      onUpdate()
+    } catch (error) {
+      console.error('Error updating verification:', error)
+    }
+  }
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      slug: '',
+      admin_email: '',
+      admin_name: ''
+    })
+    setEditingCompany(null)
     setShowCreateForm(false)
-    onUpdate()
+  }
+
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+      </div>
+    )
   }
 
   return (
@@ -79,16 +132,18 @@ const CompanyManagement = ({ onUpdate }) => {
         </motion.button>
       </div>
 
-      {/* Create Company Form */}
+      {/* Create/Edit Company Form */}
       {showCreateForm && (
         <motion.div
           initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
           className="bg-white rounded-lg shadow-lg p-6 border"
         >
-          <h3 className="text-lg font-medium text-gray-900 mb-4">Create New Company</h3>
-          <form onSubmit={createCompany} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">
+            {editingCompany ? 'Edit Company' : 'Create New Company'}
+          </h3>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Company Name
@@ -96,12 +151,13 @@ const CompanyManagement = ({ onUpdate }) => {
                 <input
                   type="text"
                   required
-                  value={newCompany.name}
-                  onChange={(e) => setNewCompany({ ...newCompany, name: e.target.value })}
+                  value={formData.name}
+                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter company name"
                 />
               </div>
+              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Slug
@@ -109,12 +165,29 @@ const CompanyManagement = ({ onUpdate }) => {
                 <input
                   type="text"
                   required
-                  value={newCompany.slug}
-                  onChange={(e) => setNewCompany({ ...newCompany, slug: e.target.value })}
+                  value={formData.slug}
+                  onChange={(e) => setFormData({ ...formData, slug: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="company-slug"
                 />
               </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Admin Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.admin_name}
+                  onChange={(e) => setFormData({ ...formData, admin_name: e.target.value })}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter admin name"
+                />
+              </div>
+              
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Admin Email
@@ -122,23 +195,24 @@ const CompanyManagement = ({ onUpdate }) => {
                 <input
                   type="email"
                   required
-                  value={newCompany.admin_email}
-                  onChange={(e) => setNewCompany({ ...newCompany, admin_email: e.target.value })}
+                  value={formData.admin_email}
+                  onChange={(e) => setFormData({ ...formData, admin_email: e.target.value })}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="admin@company.com"
                 />
               </div>
             </div>
+
             <div className="flex space-x-3">
               <button
                 type="submit"
                 className="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors"
               >
-                Create Company
+                {editingCompany ? 'Update Company' : 'Create Company'}
               </button>
               <button
                 type="button"
-                onClick={() => setShowCreateForm(false)}
+                onClick={resetForm}
                 className="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400 transition-colors"
               >
                 Cancel
@@ -161,7 +235,7 @@ const CompanyManagement = ({ onUpdate }) => {
                   Schema
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Admin Email
+                  Admin
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
@@ -188,18 +262,32 @@ const CompanyManagement = ({ onUpdate }) => {
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {company.schema_name}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {company.admin_email}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">{company.admin_name}</div>
+                      <div className="text-sm text-gray-500">{company.admin_email}</div>
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      company.is_verified ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                      company.is_verified 
+                        ? 'bg-green-100 text-green-800' 
+                        : 'bg-red-100 text-red-800'
                     }`}>
                       {company.is_verified ? 'Verified' : 'Pending'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <div className="flex space-x-2">
+                      <motion.button
+                        whileHover={{ scale: 1.1 }}
+                        whileTap={{ scale: 0.9 }}
+                        onClick={() => handleEdit(company)}
+                        className="p-2 text-blue-600 hover:bg-blue-100 rounded-full transition-colors"
+                      >
+                        <SafeIcon icon={FiEdit2} className="h-4 w-4" />
+                      </motion.button>
+                      
                       <motion.button
                         whileHover={{ scale: 1.1 }}
                         whileTap={{ scale: 0.9 }}
@@ -210,10 +298,7 @@ const CompanyManagement = ({ onUpdate }) => {
                             : 'bg-green-100 text-green-600 hover:bg-green-200'
                         }`}
                       >
-                        <SafeIcon 
-                          icon={company.is_verified ? FiX : FiCheck} 
-                          className="h-4 w-4" 
-                        />
+                        <SafeIcon icon={company.is_verified ? FiX : FiCheck} className="h-4 w-4" />
                       </motion.button>
                     </div>
                   </td>
